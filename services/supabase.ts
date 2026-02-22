@@ -13,6 +13,30 @@ export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
   }
 });
 
+// --- IMÁGENES ---
+
+export const uploadImage = async (file: File) => {
+  const BUCKET_NAME = 'content-images';
+  const fileExtension = file.name.split('.').pop();
+  const newFileName = `${crypto.randomUUID()}.${fileExtension}`;
+
+  const { data, error: uploadError } = await supabaseAdmin.storage
+    .from(BUCKET_NAME)
+    .upload(newFileName, file);
+
+  if (uploadError) {
+    console.error("Error uploading file:", uploadError);
+    return { error: uploadError, publicUrl: null };
+  }
+
+  const { data: { publicUrl } } = supabaseAdmin.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(data.path);
+
+  return { error: null, publicUrl };
+};
+
+
 // --- REGISTRO DE AUDITORÍA ---
 
 const logAdminAction = async (action: string, details: object = {}) => {
@@ -144,7 +168,7 @@ export const createContentItem = async (item: Omit<ContentItem, 'code'>) => {
 }
 
 export const updateContentItem = async (id: string, updates: Partial<ContentItem>) => {
-  const { code, is_important, ...safeUpdates } = updates;
+  const { code, ...safeUpdates } = updates;
   const result = await supabaseAdmin.from('content_items').update({ ...safeUpdates, image_url: safeUpdates.image_urls?.[0] }).eq('id', id);
   if (!result.error) {
     await logAdminAction('update_content_item', { item_id: id, updated_fields: Object.keys(safeUpdates) });
@@ -231,8 +255,8 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     failedSearches: searchLogs.filter(l => l.results_count === 0).length,
     pendingQuestions: pendingQuestions || 0,
     totalContent: contentData?.length || 0,
-    topSearches: Object.entries(topSearches).sort(([,a],[,b])=>b-a).slice(0,5).map(([q,c])=>({query:q, count:c})),
-    missingContentOpportunities: Object.entries(missingContentOpportunities).sort(([,a],[,b])=>b-a).slice(0,5).map(([q,c])=>({query:q, count:c})),
+    topSearches: Object.entries(topSearches).sort(([,a],[,b])=>(b as number)-(a as number)).slice(0,5).map(([q,c])=>({query:q, count:c as number})),
+    missingContentOpportunities: Object.entries(missingContentOpportunities).sort(([,a],[,b])=>(b as number)-(a as number)).slice(0,5).map(([q,c])=>({query:q, count:c as number})),
     categoryDistribution: Object.entries(categoryDistribution).map(([cat, c]) => ({ category: cat, count: c as number })),
     searchLogs,
   };

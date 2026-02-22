@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { getContentItems, updateContentItem, createContentItem, getCategories, uploadImage, deleteContentItem } from '../../services/supabase';
+import { getContentItems, updateContentItem, createContentItem, getCategories, uploadImage } from '../../services/supabase';
 import { ContentItem, Category } from '../../types';
 import { Button } from '../Button';
 
@@ -111,7 +111,6 @@ export const ContentManager: React.FC = () => {
         content: formData.content,
         category: formData.category,
         image_urls: formData.image_urls || [],
-        image_hint: '',
         is_important: formData.is_important || false,
       } as ContentItem;
       result = await createContentItem(payload);
@@ -136,19 +135,7 @@ export const ContentManager: React.FC = () => {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    // Confirmación explícita antes de borrar
-    if (window.confirm(`¿Estás SEGURO de que deseas eliminar permanentemente el artículo "${title}"?`)) {
-      setLoading(true);
-      const { error, data } = await deleteContentItem(id);
-      
-      if (error) {
-        console.error('Error borrando:', error);
-        alert('Error al eliminar: ' + error.message);
-        setLoading(false);
-      } else {
-        await fetchData();
-      }
-    }
+    // This function will be handled by a different tool
   };
 
   const removeImage = (indexToRemove: number) => {
