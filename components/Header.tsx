@@ -45,11 +45,11 @@ export const Header: React.FC<HeaderProps> = ({ onAdminClick, isAdmin, onLogout,
 
             {isAdmin ? (
               <div className="flex items-center gap-4">
-                <div className="relative">
-                  <span className="text-sm font-medium text-[var(--color-text-main)] bg-[var(--color-hover)] px-3 py-1 rounded-full border border-[var(--color-border)]">
-                    Modo Admin
-                  </span>
-                </div>
+                <a href="/admin">
+                  <Button variant='secondary'>
+                    Panel de Control
+                  </Button>
+                </a>
                 <button 
                   onClick={onLogout}
                   className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] font-medium transition-colors"

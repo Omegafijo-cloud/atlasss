@@ -6,7 +6,6 @@ import { Header } from '../components/Header';
 import { SearchBar } from '../components/SearchBar';
 import { ResultCard } from '../components/ResultCard';
 import { ContentDetailModal } from '../components/ContentDetailModal';
-import { NotificationToast } from '../components/NotificationToast';
 import { Button } from '../components/Button';
 import { LoginModal } from '../components/Admin/LoginModal';
 import { 
@@ -25,9 +24,10 @@ export default function Home() {
   const [showLogin, setShowLogin] = useState(false);
   
   const [searchResults, setSearchResults] = useState<ContentItem[]>([]);
+  const [searchResultCount, setSearchResultCount] = useState<number | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['all']);
   
   const [userQuestion, setUserQuestion] = useState('');
   const [questionSubmitted, setQuestionSubmitted] = useState(false);
@@ -46,14 +46,15 @@ export default function Home() {
     });
   }, []);
 
-  const handleSearch = async (query: string, categoryId: string) => {
+  const handleSearch = async (query: string, categories: string[]) => {
     setIsSearching(true);
     setHasSearched(true);
     setQuestionSubmitted(false);
-    setSelectedCategory(categoryId);
+    setSelectedCategories(categories);
     
-    const results = await searchContent(query, categoryId);
+    const results = await searchContent(query, categories);
     setSearchResults(results);
+    setSearchResultCount(results.length);
     setIsSearching(false);
   };
 
@@ -70,13 +71,9 @@ export default function Home() {
     setIsDetailModalOpen(true);
   };
 
-  // Manejadores para el Header
   const handleAdminClick = () => {
-    if (isAdmin) {
-      router.push('/admin');
-    } else {
-      setShowLogin(true);
-    }
+    if (isAdmin) router.push('/admin');
+    else setShowLogin(true);
   };
 
   const handleLoginSuccess = () => {
@@ -95,7 +92,7 @@ export default function Home() {
         onAdminClick={handleAdminClick} 
         isAdmin={isAdmin}
         onLogout={handleLogout}
-        onLogoClick={() => window.location.reload()} // O router.push('/')
+        onLogoClick={() => window.location.reload()}
         notificationCount={pendingCount}
       />
 
@@ -108,49 +105,38 @@ export default function Home() {
         </div>
 
         <div className="mb-16">
-          <SearchBar onSearch={handleSearch} selectedCategory={selectedCategory} />
+          <SearchBar 
+            onSearch={handleSearch} 
+            selectedCategories={selectedCategories} 
+            resultCount={searchResultCount}
+            isSearching={isSearching}
+          />
         </div>
 
-        {hasSearched && (
+        {hasSearched && !isSearching && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            
-            {isSearching ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+            {searchResults.length > 0 ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {searchResults.map(item => (
+                    <ResultCard key={item.id} item={item} onClick={() => openDetail(item)} />
+                  ))}
+                </div>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center border-b border-[var(--color-border)] pb-2">
-                  <h2 className="text-xl font-bold text-[var(--color-text-main)]">Resultados ({searchResults.length})</h2>
-                  {selectedCategory !== 'all' && (
-                    <span className="text-sm bg-[var(--color-card)] text-[var(--color-primary)] px-3 py-1 rounded-full font-semibold border border-[var(--color-border)]">
-                      Filtrado por: {selectedCategory}
-                    </span>
-                  )}
-                </div>
-                
-                {searchResults.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {searchResults.map(item => (
-                      <ResultCard key={item.id} item={item} onClick={() => openDetail(item)} />
-                    ))}
-                  </div>
+              <div className="text-center py-12 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)]">
+                <h3 className="text-xl font-bold text-[var(--color-text-main)] mb-2">Sin resultados</h3>
+                <p className="text-[var(--color-text-secondary)] mb-6">¿Quieres escalar esta duda?</p>
+                {!questionSubmitted ? (
+                  <form onSubmit={handleSubmitQuestion} className="max-w-md mx-auto flex gap-2 px-4">
+                    <input
+                      type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)}
+                      placeholder="Describe tu duda..." className="flex-1 p-3 border rounded-lg outline-none focus:border-[var(--color-primary)] bg-[var(--color-input-bg)] text-[var(--color-text-main)]"
+                    />
+                    <Button type="submit">Enviar</Button>
+                  </form>
                 ) : (
-                  <div className="text-center py-12 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)]">
-                    <h3 className="text-xl font-bold text-[var(--color-text-main)] mb-2">Sin resultados</h3>
-                    <p className="text-[var(--color-text-secondary)] mb-6">¿Quieres escalar esta duda?</p>
-                    {!questionSubmitted ? (
-                      <form onSubmit={handleSubmitQuestion} className="max-w-md mx-auto flex gap-2 px-4">
-                        <input
-                          type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)}
-                          placeholder="Describe tu duda..." className="flex-1 p-3 border rounded-lg outline-none focus:border-[var(--color-primary)] bg-[var(--color-input-bg)] text-[var(--color-text-main)]"
-                        />
-                        <Button type="submit">Enviar</Button>
-                      </form>
-                    ) : (
-                      <div className="text-green-600 font-bold">¡Duda enviada con éxito!</div>
-                    )}
-                  </div>
+                  <div className="text-green-600 font-bold">¡Duda enviada con éxito!</div>
                 )}
               </div>
             )}

@@ -28,12 +28,14 @@ export const ResultCard: React.FC<ResultCardProps> = ({ item, onClick }) => {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-rose-50 text-rose-200">
-             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+          <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
+             <svg className="w-12 h-12" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <title>Sin imagen</title>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+             </svg>
           </div>
         )}
         
-        {/* Important Badge */}
         {isImportant && (
           <div className="absolute top-3 left-3 z-10">
             <span className="bg-yellow-400 text-black text-[10px] font-black px-2 py-0.5 rounded uppercase shadow-sm flex items-center gap-1">
@@ -60,7 +62,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ item, onClick }) => {
         <h3 className={`text-lg font-bold mb-2 leading-tight transition-colors line-clamp-2 ${isImportant ? 'text-black' : 'text-[#2F3542] group-hover:text-[#FF4757]'}`}>
           {item.title}
         </h3>
-        <p className="text-[#747D8C] text-sm leading-relaxed line-clamp-2 mb-4">
+        
+        <p className="text-[#747D8C] text-sm leading-relaxed line-clamp-2 mb-4 min-h-[2.5rem]">
           {item.content}
         </p>
         

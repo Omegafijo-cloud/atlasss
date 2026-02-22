@@ -1,11 +1,10 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, User } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE } from '../constants';
 import { DashboardStats, SearchLog, ContentItem, UserQuestion, Category } from '../types';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// FIXED: Disable auth persistence for the admin client.
 export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
   auth: {
     persistSession: false,
@@ -13,6 +12,28 @@ export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
     detectSessionInUrl: false
   }
 });
+
+// --- REGISTRO DE AUDITORÍA ---
+
+const logAdminAction = async (action: string, details: object = {}) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn("Intento de registro de auditoría sin usuario autenticado.");
+      return;
+    }
+
+    await supabaseAdmin.from('admin_audit_log').insert({
+      action,
+      details,
+      admin_id: user.id,
+      admin_email: user.email
+    });
+  } catch (error) {
+    console.error("Error al registrar la acción de auditoría:", error);
+  }
+};
+
 
 // --- CATEGORÍAS ---
 
@@ -31,38 +52,36 @@ export const createCategory = async (name: string, color: string = '#FF4757') =>
     return { data: null, error: { message: "El nombre de la categoría no puede estar vacío." } };
   }
 
-  // Check for case-insensitive duplicates
-  const { data: existing } = await supabaseAdmin
-    .from('categories')
-    .select('name')
-    .ilike('name', trimmedName);
+  const { data: existing } = await supabaseAdmin.from('categories').select('name').ilike('name', trimmedName);
 
   if (existing && existing.length > 0) {
     return { data: null, error: { message: `La categoría "${trimmedName}" ya existe.` } };
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .insert({ 
-      name: trimmedName, 
-      color 
-    })
-    .select();
+  const { data, error } = await supabaseAdmin.from('categories').insert({ name: trimmedName, color }).select();
+  
+  if (!error && data) {
+    await logAdminAction('create_category', { category_id: data[0].id, name: trimmedName, color });
+  }
+  
   return { data, error };
 };
 
 export const updateCategory = async (id: string, name: string) => {
-  return await supabaseAdmin
-    .from('categories')
-    .update({ name: name.trim() })
-    .eq('id', id);
+  const result = await supabaseAdmin.from('categories').update({ name: name.trim() }).eq('id', id);
+  if (!result.error) {
+    await logAdminAction('update_category', { category_id: id, new_name: name.trim() });
+  }
+  return result;
 };
 
 export const deleteCategory = async (id: string) => {
-  return await supabaseAdmin
-    .from('categories')
-    .delete()
-    .eq('id', id);
+  const { data: category } = await supabaseAdmin.from('categories').select('name').eq('id', id).single();
+  const result = await supabaseAdmin.from('categories').delete().eq('id', id);
+  if (!result.error && category) {
+    await logAdminAction('delete_category', { category_id: id, name: category.name });
+  }
+  return result;
 };
 
 // --- CONTENIDO ---
@@ -77,28 +96,24 @@ const normalizeContentItem = (item: any): ContentItem => {
   };
 };
 
-export const searchContent = async (query: string, categoryName?: string) => {
+export const searchContent = async (query: string, categoryNames?: string[]) => {
   let dbQuery = supabase.from('content_items').select('*');
   
   if (query && query.trim() !== '') {
     dbQuery = dbQuery.or(`title.ilike.%${query}%,content.ilike.%${query}%,code.ilike.%${query}%`);
   }
   
-  if (categoryName && categoryName !== 'all') {
-    dbQuery = dbQuery.eq('category', categoryName);
+  if (categoryNames && categoryNames.length > 0 && !categoryNames.includes('all')) {
+    dbQuery = dbQuery.in('category', categoryNames);
   }
 
-  // Ordenar: Primero los importantes, luego por fecha
-  const { data, error } = await dbQuery
-    .order('is_important', { ascending: false })
-    .order('created_at', { ascending: false });
+  const { data, error } = await dbQuery.order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error en búsqueda Atlass:', error);
     return [];
   }
 
-  // Registrar log de búsqueda
   if (query && query.trim() !== '') {
     supabase.from('search_logs').insert({
       query: query.toLowerCase().trim(),
@@ -109,163 +124,57 @@ export const searchContent = async (query: string, categoryName?: string) => {
   return (data || []).map(normalizeContentItem);
 };
 
-export const getRecentContent = async (limit: number = 5) => {
-  const { data, error } = await supabase
-    .from('content_items')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-    
-  if (error) return [];
-  return (data || []).map(normalizeContentItem);
-};
-
-export const uploadImage = async (file: File) => {
-  const BUCKET_NAME = 'content-images'; 
-
-  try {
-    const { error: bucketError } = await supabaseAdmin.storage.getBucket(BUCKET_NAME);
-    if (bucketError) {
-      await supabaseAdmin.storage.createBucket(BUCKET_NAME, {
-        public: true,
-        fileSizeLimit: 5242880,
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/jpg']
-      });
-    }
-  } catch (e) {
-    console.warn("Excepción verificando bucket:", e);
-  }
-
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-  
-  const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false,
-      contentType: file.type
-    });
-
-  if (error) {
-    console.error("Error uploading image:", error);
-    return { error };
-  }
-
-  const { data: { publicUrl } } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(fileName);
-
-  return { publicUrl, error: null };
-};
-
 export const createContentItem = async (item: Omit<ContentItem, 'code'>) => {
-    // Robust check for unique code
-    const { data: existingItems } = await supabaseAdmin
-      .from('content_items')
-      .select('code');
-
-    const existingCodes = new Set<number>();
-    if (existingItems) {
-      existingItems.forEach(i => {
-        const parsed = parseInt(i.code);
-        if (!isNaN(parsed)) existingCodes.add(parsed);
-      });
-    }
+    const { data: existingItems } = await supabaseAdmin.from('content_items').select('code');
+    const existingCodes = new Set<number>((existingItems || []).map(i => parseInt(i.code)).filter(n => !isNaN(n)));
 
     let nextCode = 100;
-    while (existingCodes.has(nextCode)) {
-      nextCode++;
-    }
+    while (existingCodes.has(nextCode)) nextCode++;
 
-    const { id, title, content, category, image_urls, image_hint, is_important } = item;
-    const finalId = id || crypto.randomUUID(); 
+    const finalId = item.id || crypto.randomUUID();
+    const dbPayload = { ...item, id: finalId, code: nextCode.toString(), image_url: item.image_urls[0] || null };
     
-    const dbPayload = { 
-      id: finalId, 
-      title, 
-      content, 
-      category, 
-      code: nextCode.toString(), 
-      image_urls,
-      image_hint: image_hint || null,
-      image_url: image_urls.length > 0 ? image_urls[0] : null,
-      is_important: is_important || false
-    };
-    
-    const { data, error } = await supabaseAdmin
-      .from('content_items')
-      .insert(dbPayload)
-      .select();
+    const { data, error } = await supabaseAdmin.from('content_items').insert(dbPayload).select();
       
-    if (error) console.error("Error creating content item:", error);
+    if (!error && data) {
+      await logAdminAction('create_content_item', { item_id: data[0].id, title: item.title });
+    }
 
     return { data, error };
 }
 
 export const updateContentItem = async (id: string, updates: Partial<ContentItem>) => {
-  // Prevent modification of 'code'
-  const { code, ...safeUpdates } = updates;
-
-  const { error } = await supabaseAdmin
-    .from('content_items')
-    .update({
-      ...safeUpdates,
-      image_url: safeUpdates.image_urls && safeUpdates.image_urls.length > 0 ? safeUpdates.image_urls[0] : undefined
-    })
-    .eq('id', id);
-  return { error };
+  const { code, is_important, ...safeUpdates } = updates;
+  const result = await supabaseAdmin.from('content_items').update({ ...safeUpdates, image_url: safeUpdates.image_urls?.[0] }).eq('id', id);
+  if (!result.error) {
+    await logAdminAction('update_content_item', { item_id: id, updated_fields: Object.keys(safeUpdates) });
+  }
+  return { error: result.error };
 };
 
 export const deleteContentItem = async (id: string) => {
   const BUCKET_NAME = 'content-images';
+  const { data: item } = await supabaseAdmin.from('content_items').select('image_urls, title').eq('id', id).single();
 
-  // 1. Obtener el item para ver sus imágenes antes de borrarlo
-  const { data: item } = await supabaseAdmin
-    .from('content_items')
-    .select('image_urls')
-    .eq('id', id)
-    .single();
-
-  if (item && item.image_urls && Array.isArray(item.image_urls) && item.image_urls.length > 0) {
-    // 2. Extraer nombres de archivo de las URLs
-    // URL típica: https://[...]/storage/v1/object/public/content-images/[archivo.jpg]
-    const filesToRemove = item.image_urls
-      .map((url: string) => {
-        // Separa la URL por el nombre del bucket para obtener la ruta relativa del archivo
-        const parts = url.split(`/${BUCKET_NAME}/`);
-        return parts.length > 1 ? parts[1] : null;
-      })
-      .filter((file: string | null) => file !== null) as string[];
-
-    // 3. Borrar imágenes del storage si existen archivos válidos
+  if (item?.image_urls?.length) {
+    const filesToRemove = item.image_urls.map((url: string) => url.split(`/${BUCKET_NAME}/`)[1]).filter(Boolean);
     if (filesToRemove.length > 0) {
-      const { error: storageError } = await supabaseAdmin.storage
-        .from(BUCKET_NAME)
-        .remove(filesToRemove);
-      
-      if (storageError) {
-        console.warn("Error limpiando imágenes del bucket:", storageError);
-      }
+      await supabaseAdmin.storage.from(BUCKET_NAME).remove(filesToRemove);
     }
   }
 
-  // 4. Borrar registro de la base de datos
-  return await supabaseAdmin
-    .from('content_items')
-    .delete()
-    .eq('id', id)
-    .select();
+  const result = await supabaseAdmin.from('content_items').delete().eq('id', id).select();
+  
+  if (!result.error && item) {
+    await logAdminAction('delete_content_item', { item_id: id, title: item.title });
+  }
+  
+  return result;
 };
 
 export const getContentItems = async () => {
-    const { data, error } = await supabaseAdmin
-      .from('content_items')
-      .select('*')
-      .order('created_at', { ascending: false });
-      
-    if (error) return { data: [], error };
-    return { data: data.map(normalizeContentItem), error };
+    const { data, error } = await supabaseAdmin.from('content_items').select('*').order('created_at', { ascending: false });
+    return { data: (data || []).map(normalizeContentItem), error };
 }
 
 // --- AUTENTICACIÓN Y USUARIOS ---
@@ -285,80 +194,46 @@ export const getSession = async () => {
 // --- PREGUNTAS Y ESTADÍSTICAS ---
 
 export const submitUserQuestion = async (question: string) => {
-  const { error } = await supabase.from('user_questions').insert({
-    id: crypto.randomUUID(), 
-    question,
-  });
-  return { error };
+  return await supabase.from('user_questions').insert({ id: crypto.randomUUID(), question });
 };
 
 export const getPendingQuestionsCount = async () => {
-  const { count, error } = await supabaseAdmin
-    .from('user_questions')
-    .select('*', { count: 'exact', head: true });
-  return { count: count || 0, error };
+  const { count } = await supabaseAdmin.from('user_questions').select('*', { count: 'exact', head: true });
+  return { count: count || 0 };
 };
 
 export const subscribeToQuestions = (onInsert: (payload: any) => void) => {
   return supabase
     .channel('questions-channel')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_questions' }, (payload) => onInsert(payload))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_questions' }, onInsert)
     .subscribe();
 };
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
-  const { data: contentData } = await supabaseAdmin.from('content_items').select('category');
-  const categoryDistributionMap = (contentData || []).reduce((acc: any, item: any) => {
-    const cat = item.category || 'Sin Categoría';
-    acc[cat] = (acc[cat] || 0) + 1;
-    return acc;
-  }, {});
-  
-  const categoryDistribution = Object.entries(categoryDistributionMap).map(([category, count]) => ({ 
-    category, 
-    count: count as number 
-  }));
+  const [{ data: contentData }, { count: pendingQuestions }, { data: logs }] = await Promise.all([
+    supabaseAdmin.from('content_items').select('category'),
+    supabaseAdmin.from('user_questions').select('*', { count: 'exact', head: true }),
+    supabaseAdmin.from('search_logs').select('*').order('created_at', { ascending: false }).limit(1000)
+  ]);
 
-  const { count: pendingQuestions } = await supabaseAdmin.from('user_questions').select('*', { count: 'exact', head: true });
-  
-  const { data: logs } = await supabaseAdmin
-    .from('search_logs')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1000);
-    
-  const searchLogs = (logs as SearchLog[]) || [];
-  
-  const topQueries = searchLogs.reduce((acc: any, curr) => {
-    acc[curr.query] = (acc[curr.query] || 0) + 1;
-    return acc;
-  }, {});
-
-  const topSearches = Object.entries(topQueries)
-    .sort(([,a]: any, [,b]: any) => b - a)
-    .slice(0, 5)
-    .map(([query, count]) => ({ query, count: count as number }));
-
-  const missingQueries = searchLogs
-    .filter(l => l.results_count === 0)
-    .reduce((acc: any, curr) => {
-      acc[curr.query] = (acc[curr.query] || 0) + 1;
+  const searchLogs: SearchLog[] = logs || [];
+  const categoryDistribution = (contentData || []).reduce((acc: any, { category }) => {
+      const cat = category || 'Sin Categoría';
+      acc[cat] = (acc[cat] || 0) + 1;
       return acc;
-    }, {});
+  }, {});
 
-  const missingContentOpportunities = Object.entries(missingQueries)
-    .sort(([,a]: any, [,b]: any) => b - a)
-    .slice(0, 5)
-    .map(([query, count]) => ({ query, count: count as number }));
+  const topSearches = searchLogs.reduce((acc, { query }) => ({ ...acc, [query]: (acc[query] || 0) + 1 }), {} as any);
+  const missingContentOpportunities = searchLogs.filter(l => l.results_count === 0).reduce((acc, { query }) => ({ ...acc, [query]: (acc[query] || 0) + 1 }), {} as any);
 
   return {
     totalSearches: searchLogs.length,
     failedSearches: searchLogs.filter(l => l.results_count === 0).length,
     pendingQuestions: pendingQuestions || 0,
     totalContent: contentData?.length || 0,
-    topSearches,
-    missingContentOpportunities,
-    categoryDistribution,
+    topSearches: Object.entries(topSearches).sort(([,a],[,b])=>b-a).slice(0,5).map(([q,c])=>({query:q, count:c})),
+    missingContentOpportunities: Object.entries(missingContentOpportunities).sort(([,a],[,b])=>b-a).slice(0,5).map(([q,c])=>({query:q, count:c})),
+    categoryDistribution: Object.entries(categoryDistribution).map(([cat, c]) => ({ category: cat, count: c as number })),
     searchLogs,
   };
 };
