@@ -1,3 +1,51 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --color-primary: #FF4757;
+  --color-primary-light: #ff6b81;
+  --color-bg: #F1F2F6;
+  --color-card: #FFFFFF;
+  --color-card-hover: #f9fafb;
+  --color-text-main: #2F3542;
+  --color-text-secondary: #747D8C;
+  --color-border: #DFE4EA;
+  --color-input-bg: #FFFFFF;
+}
+
+[data-theme="dark"] {
+  --color-primary: #FF6B81;
+  --color-primary-light: #ff8b9a;
+  --color-bg: #1E272E;
+  --color-card: #2F3640;
+  --color-card-hover: #353B48;
+  --color-text-main: #F5F6FA;
+  --color-text-secondary: #A4B0BE;
+  --color-border: #485460;
+  --color-input-bg: #353B48;
+}
+
+[data-theme="ocean"] {
+  --color-primary: #1E90FF;
+  --color-primary-light: #4dabf7;
+  --color-bg: #EBF8FF;
+  --color-card: #FFFFFF;
+  --color-card-hover: #F0F4F8;
+  --color-text-main: #2C3E50;
+  --color-text-secondary: #7F8FA6;
+  --color-border: #BDC3C7;
+  --color-input-bg: #FFFFFF;
+}
+
+[data-theme="forest"] {
+    --color-primary: #2ED573;
+    --color-primary-light: #52d98c;
+    --color-bg: #F1F8E9;
+    --color-card: #FFFFFF;
+    --color-card-hover: #F1F8E9;
+    --color-text-main: #1E272E;
+    --color-text-secondary: #6ab04c;
+    --color-border: #C8E6C9;
+    --color-input-bg: #FFFFFF;
+}

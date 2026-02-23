@@ -1,6 +1,7 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['lucide-react'],
   output: 'standalone',
   images: {
     remotePatterns: [
@@ -10,7 +11,6 @@ const nextConfig = {
       },
     ],
   },
-  // Deshabilitar la verificación estricta de React para compatibilidad con ciertas librerías UI si es necesario
   reactStrictMode: true,
 };
 

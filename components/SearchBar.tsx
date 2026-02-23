@@ -14,7 +14,7 @@ interface SearchBarProps {
 }
 
 const CAT_CACHE_KEY = 'atlass_categories_cache';
-const CAT_CACHE_EXPIRY = 24 * 60 * 60 * 1000;
+const CAT_CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 horas
 
 export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, selectedCategories, resultCount, isSearching }) => {
   const [input, setInput] = useState('');
@@ -30,7 +30,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, selectedCategori
             setCategories(parsed.data);
             return;
           }
-        } catch (e) { console.warn('Cache parsing failed'); }
+        } catch (e) { console.warn('Fallo al parsear la caché de categorías'); }
       }
       const { data } = await getCategories();
       setCategories(data);
@@ -58,41 +58,50 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, selectedCategori
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-4">
+    <div className="w-full max-w-4xl mx-auto space-y-6">
       <form onSubmit={handleSubmit} className="relative group">
-        {/* Input y botón de búsqueda */}
         <input
           type="text" value={input} onChange={(e) => setInput(e.target.value)}
-          placeholder="Busca por nombre o código numérico..."
-          className="w-full pl-6 pr-4 py-4 rounded-xl border-2 border-[var(--color-border)] bg-[var(--color-card)] ..."
+          placeholder="Busca por nombre, descripción o código numérico..."
+          className="w-full pl-6 pr-32 py-5 text-lg rounded-xl border-2 border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-text-main)] outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] transition-all duration-300 shadow-sm group-hover:border-[var(--color-primary-light)]"
         />
-        <div className="absolute inset-y-0 right-2 flex items-center">
-          <Button type="submit" disabled={isSearching}>Buscar</Button>
+        <div className="absolute inset-y-0 right-3 flex items-center">
+          <Button type="submit" disabled={isSearching} className="shadow-md hover:shadow-lg">
+            Buscar
+          </Button>
         </div>
       </form>
 
-      {/* Filtros de categoría */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={() => handleCategoryClick('all')}
-          className={`px-4 py-1.5 ... ${selectedCategories.includes('all') ? '...' : '...'}`}>
+          className={`px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
+            selectedCategories.includes('all') 
+              ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md'
+              : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-card-hover)] hover:border-[var(--color-primary-light)]'
+          }`}>
           Todo
         </button>
         {categories.map((cat) => (
           <button key={cat.id} onClick={() => handleCategoryClick(cat.name)}
-            className={`px-4 py-1.5 ... ${selectedCategories.includes(cat.name) ? '...' : '...'}`}>
+            className={`px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
+              selectedCategories.includes(cat.name) 
+                ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md'
+                : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-card-hover)] hover:border-[var(--color-primary-light)]'
+            }`}>
             {cat.name}
           </button>
         ))}
       </div>
 
-      {/* Contador de resultados e indicador de búsqueda */}
-      <div className="text-center h-6">
+      <div className="text-center h-8 flex items-center justify-center">
         {isSearching ? (
-          <p className="text-sm text-[var(--color-text-secondary)] animate-pulse">Buscando...</p>
+          <p className="text-md font-medium text-[var(--color-text-secondary)] animate-pulse">Buscando resultados...</p>
         ) : resultCount !== null && (
-          <p className={`text-sm transition-opacity duration-300 ${resultCount > 0 ? 'text-green-600' : 'text-red-500'}`}>
-            {resultCount > 0 ? `${resultCount} resultado${resultCount !== 1 ? 's' : ''} encontrado${resultCount !== 1 ? 's' : ''}.` : "No se encontraron resultados."}
+          <p className={`text-md font-medium transition-opacity duration-300 ${
+              resultCount > 0 ? 'text-green-600' : 'text-red-500'
+            }`}>
+            {resultCount > 0 ? `${resultCount} resultado${resultCount !== 1 ? 's' : ''} encontrado${resultCount !== 1 ? 's' : ''}.` : "No se han encontrado resultados para tu búsqueda."}
           </p>
         )}
       </div>

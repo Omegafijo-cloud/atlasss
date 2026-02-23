@@ -96,15 +96,15 @@ export default function Home() {
         notificationCount={pendingCount}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-[var(--color-text-main)] mb-4">Buscador Inteligente Atlass</h1>
-          <p className="text-[var(--color-text-secondary)] text-lg max-w-2xl mx-auto">
-            Base de conocimientos centralizada y soporte técnico.
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center mb-16">
+          <h1 className="text-5xl font-extrabold text-[var(--color-text-main)] mb-4 tracking-tight">Buscador Inteligente Atlass</h1>
+          <p className="text-[var(--color-text-secondary)] text-xl max-w-3xl mx-auto">
+            Tu base de conocimientos centralizada y soporte técnico inteligente.
           </p>
         </div>
 
-        <div className="mb-16">
+        <div className="mb-20">
           <SearchBar 
             onSearch={handleSearch} 
             selectedCategories={selectedCategories} 
@@ -114,29 +114,29 @@ export default function Home() {
         </div>
 
         {hasSearched && !isSearching && (
-          <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="space-y-12 animate-in fade-in duration-700">
             {searchResults.length > 0 ? (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                   {searchResults.map(item => (
                     <ResultCard key={item.id} item={item} onClick={() => openDetail(item)} />
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12 bg-[var(--color-card)] rounded-xl border border-[var(--color-border)]">
-                <h3 className="text-xl font-bold text-[var(--color-text-main)] mb-2">Sin resultados</h3>
-                <p className="text-[var(--color-text-secondary)] mb-6">¿Quieres escalar esta duda?</p>
+              <div className="text-center py-16 bg-[var(--color-card)] rounded-2xl border border-[var(--color-border)] shadow-sm">
+                <h3 className="text-2xl font-bold text-[var(--color-text-main)] mb-3">Sin resultados</h3>
+                <p className="text-[var(--color-text-secondary)] mb-8">¿No encontraste lo que buscabas? Permítenos ayudarte.</p>
                 {!questionSubmitted ? (
-                  <form onSubmit={handleSubmitQuestion} className="max-w-md mx-auto flex gap-2 px-4">
+                  <form onSubmit={handleSubmitQuestion} className="max-w-lg mx-auto flex flex-col sm:flex-row gap-3 px-4">
                     <input
                       type="text" value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)}
-                      placeholder="Describe tu duda..." className="flex-1 p-3 border rounded-lg outline-none focus:border-[var(--color-primary)] bg-[var(--color-input-bg)] text-[var(--color-text-main)]"
+                      placeholder="Describe tu duda detalladamente..." className="flex-1 p-4 border rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-[var(--color-input-bg)] text-[var(--color-text-main)] transition-shadow"
                     />
-                    <Button type="submit">Enviar</Button>
+                    <Button type="submit">Enviar consulta</Button>
                   </form>
                 ) : (
-                  <div className="text-green-600 font-bold">¡Duda enviada con éxito!</div>
+                  <div className="text-green-500 font-semibold text-lg">¡Duda enviada con éxito! Nuestro equipo te contactará pronto.</div>
                 )}
               </div>
             )}
